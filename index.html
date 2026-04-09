@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR Collection Game</title>
+    <title>AR Collection Game - Debug Mode</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
@@ -11,19 +11,19 @@
 
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; padding: 20px; }
         #score-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); color: #00ffcc; font-size: 24px; font-weight: bold; z-index: 100; text-shadow: 2px 2px 4px #000; pointer-events: none; }
-        button { padding: 15px 40px; font-size: 18px; background: #00ffcc; border: none; border-radius: 30px; color: #000; font-weight: bold; cursor: pointer; }
-        .loading-text { margin-top: 15px; font-size: 14px; color: #888; }
+        button { padding: 15px 40px; font-size: 18px; background: #00ffcc; border: none; border-radius: 30px; color: #000; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .hint { margin-top: 15px; font-size: 14px; color: #888; line-height: 1.6; }
     </style>
 </head>
 
 <body>
     <div id="overlay">
-        <h1>AR 蔬果采集</h1>
-        <p>请授权摄像头与重力感应权限</p>
-        <button id="start-btn">开始游戏</button>
-        <p class="loading-text" id="status-text">等待资源加载...</p>
+        <h1>AR 采集挑战</h1>
+        <p>1. 授权摄像头和重力感应<br>2. 对准带有黑框的海报</p>
+        <button id="start-btn">开启 AR 空间</button>
+        <p class="hint" id="status-text">正在准备环境...</p>
     </div>
 
     <div id="score-ui">得分: 0</div>
@@ -34,7 +34,7 @@
         renderer="logarithmicDepthBuffer: true; colorManagement: true; precision: medium;"
         vr-mode-ui="enabled: false">
         
-        <a-assets timeout="30000">
+        <a-assets timeout="180000">
             <a-asset-item id="cup-m" src="cup-v6.glb"></a-asset-item>
             <a-asset-item id="apple-m" src="apple-v2.glb"></a-asset-item>
             <a-asset-item id="kale-m" src="kale-v3.glb"></a-asset-item>
@@ -43,8 +43,11 @@
         </a-assets>
 
         <a-marker type="pattern" url="poster.patt" id="game-marker">
-            <a-entity light="type: ambient; intensity: 1.0;"></a-entity>
-            <a-entity light="type: directional; position: 0 5 0; intensity: 0.5;"></a-entity>
+            
+            <a-box position="0 0.2 0" material="color: red; opacity: 0.8" scale="0.2 0.2 0.2"></a-box>
+
+            <a-entity light="type: ambient; intensity: 1.2;"></a-entity>
+            <a-entity light="type: directional; position: 0 5 0; intensity: 0.6;"></a-entity>
 
             <a-entity id="player-cup" 
                       gltf-model="#cup-m" 
@@ -66,31 +69,26 @@
         const dropZone = document.querySelector('#drop-zone');
         const models = ['#apple-m', '#kale-m', '#kugua-m', '#lemon-m'];
 
-        // 监听模型加载状态
         document.querySelector('a-assets').addEventListener('loaded', () => {
-            document.getElementById('status-text').innerText = "资源就绪，请点击开始";
+            document.getElementById('status-text').innerText = "资源已就绪，请开始";
         });
 
-        // 启动逻辑
         document.getElementById('start-btn').addEventListener('click', function() {
             document.getElementById('overlay').style.display = 'none';
             isStarted = true;
-
-            // iOS 重力感应授权
-            if (DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // 激活 iOS 传感器
+            if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission();
             }
-
             startGameLoop();
         });
 
-        // 陀螺仪移动逻辑
         window.addEventListener('deviceorientation', (e) => {
             if(!isStarted) return;
-            let tilt = e.gamma; // 左右倾斜幅度
-            if(Math.abs(tilt) > 2) {
-                cupX += tilt * 0.005; 
-                cupX = Math.max(-1.5, Math.min(1.5, cupX)); // 限制在海报内
+            let tilt = e.gamma; 
+            if(Math.abs(tilt) > 1.5) {
+                cupX += tilt * 0.006; 
+                cupX = Math.max(-1.2, Math.min(1.2, cupX)); 
                 player.setAttribute('position', `${cupX} 0.1 0`);
             }
         });
@@ -98,11 +96,10 @@
         function startGameLoop() {
             setInterval(() => {
                 const marker = document.querySelector('#game-marker');
-                // 仅在扫到海报时产生掉落物
-                if (marker.getAttribute('visible')) {
+                if (marker && marker.getAttribute('visible')) {
                     createFruit();
                 }
-            }, 1800);
+            }, 2000);
         }
 
         function createFruit() {
@@ -118,11 +115,10 @@
             dropZone.appendChild(fruit);
 
             const fallTick = setInterval(() => {
-                yPos -= 0.05;
+                yPos -= 0.06;
                 fruit.setAttribute('position', `${xPos} ${yPos} 0`);
 
-                // 简单的碰撞检测
-                if (yPos < 0.3 && yPos > 0 && Math.abs(xPos - cupX) < 0.3) {
+                if (yPos < 0.4 && yPos > 0 && Math.abs(xPos - cupX) < 0.35) {
                     score += 10;
                     document.getElementById('score-ui').innerText = `得分: ${score}`;
                     clearInterval(fallTick);
@@ -133,7 +129,7 @@
                     clearInterval(fallTick);
                     fruit.remove();
                 }
-            }, 20);
+            }, 25);
         }
     </script>
 </body>
