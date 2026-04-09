@@ -2,33 +2,57 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>AR Collection Game</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
+
     <style>
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
-        #score-panel { position: fixed; top: 20px; width: 100%; text-align: center; color: #00ffcc; font-family: sans-serif; font-size: 24px; z-index: 100; text-shadow: 0 0 5px #000; }
-        button { padding: 15px 30px; font-size: 18px; background: #00ffcc; border: none; border-radius: 50px; cursor: pointer; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; }
+        #score-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); color: #00ffcc; font-size: 24px; font-weight: bold; z-index: 100; text-shadow: 2px 2px 4px #000; pointer-events: none; }
+        button { padding: 15px 40px; font-size: 18px; background: #00ffcc; border: none; border-radius: 30px; color: #000; font-weight: bold; cursor: pointer; }
+        .loading-text { margin-top: 15px; font-size: 14px; color: #888; }
     </style>
 </head>
 
-<body style="margin: 0; overflow: hidden;">
+<body>
     <div id="overlay">
-        <h1>准备好 AR 挑战了吗？</h1>
-        <p>请对准海报，倾斜手机控制杯子</p>
-        <button onclick="initGame()">点击开始</button>
+        <h1>AR 蔬果采集</h1>
+        <p>请授权摄像头与重力感应权限</p>
+        <button id="start-btn">开始游戏</button>
+        <p class="loading-text" id="status-text">等待资源加载...</p>
     </div>
 
-    <div id="score-panel">得分: 0</div>
+    <div id="score-ui">得分: 0</div>
 
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;">
-        <a-assets>
-            <a-asset-item id="cup-model" src="cup.glb"></a-asset-item>
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        renderer="logarithmicDepthBuffer: true; colorManagement: true; precision: medium;"
+        vr-mode-ui="enabled: false">
+        
+        <a-assets timeout="30000">
+            <a-asset-item id="cup-m" src="cup-v6.glb"></a-asset-item>
+            <a-asset-item id="apple-m" src="apple-v2.glb"></a-asset-item>
+            <a-asset-item id="kale-m" src="kale-v3.glb"></a-asset-item>
+            <a-asset-item id="kugua-m" src="kugua-v4.glb"></a-asset-item>
+            <a-asset-item id="lemon-m" src="lemon-v5.glb"></a-asset-item>
         </a-assets>
 
-        <a-marker type="pattern" url="poster.patt" id="marker">
-            <a-entity id="cup-entity" gltf-model="#cup-model" scale="0.5 0.5 0.5" position="0 0.1 0"></a-entity>
-            <a-entity id="items-group"></a-entity>
+        <a-marker type="pattern" url="poster.patt" id="game-marker">
+            <a-entity light="type: ambient; intensity: 1.0;"></a-entity>
+            <a-entity light="type: directional; position: 0 5 0; intensity: 0.5;"></a-entity>
+
+            <a-entity id="player-cup" 
+                      gltf-model="#cup-m" 
+                      scale="0.1 0.1 0.1" 
+                      position="0 0.1 0">
+            </a-entity>
+
+            <a-entity id="drop-zone"></a-entity>
         </a-marker>
 
         <a-entity camera></a-entity>
@@ -37,58 +61,78 @@
     <script>
         let score = 0;
         let cupX = 0;
-        let isPlaying = false;
-        const cup = document.getElementById('cup-entity');
-        const container = document.getElementById('items-group');
+        let isStarted = false;
+        const player = document.querySelector('#player-cup');
+        const dropZone = document.querySelector('#drop-zone');
+        const models = ['#apple-m', '#kale-m', '#kugua-m', '#lemon-m'];
 
-        function initGame() {
+        // 监听模型加载状态
+        document.querySelector('a-assets').addEventListener('loaded', () => {
+            document.getElementById('status-text').innerText = "资源就绪，请点击开始";
+        });
+
+        // 启动逻辑
+        document.getElementById('start-btn').addEventListener('click', function() {
             document.getElementById('overlay').style.display = 'none';
-            isPlaying = true;
-            // 兼容 iOS 的重力感应授权请求
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            isStarted = true;
+
+            // iOS 重力感应授权
+            if (DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission();
             }
-            startSpawning();
-        }
 
-        // 监听手机倾斜
-        window.addEventListener('deviceorientation', (event) => {
-            if (!isPlaying) return;
-            let tilt = event.gamma; // 左右倾斜
-            if (Math.abs(tilt) > 3) {
-                cupX += tilt * 0.006;
-                cupX = Math.max(-1.5, Math.min(1.5, cupX)); 
-                cup.setAttribute('position', `${cupX} 0.1 0`);
+            startGameLoop();
+        });
+
+        // 陀螺仪移动逻辑
+        window.addEventListener('deviceorientation', (e) => {
+            if(!isStarted) return;
+            let tilt = e.gamma; // 左右倾斜幅度
+            if(Math.abs(tilt) > 2) {
+                cupX += tilt * 0.005; 
+                cupX = Math.max(-1.5, Math.min(1.5, cupX)); // 限制在海报内
+                player.setAttribute('position', `${cupX} 0.1 0`);
             }
         });
 
-        function startSpawning() {
+        function startGameLoop() {
             setInterval(() => {
-                if (!isPlaying) return;
-                createDrop();
-            }, 1200);
+                const marker = document.querySelector('#game-marker');
+                // 仅在扫到海报时产生掉落物
+                if (marker.getAttribute('visible')) {
+                    createFruit();
+                }
+            }, 1800);
         }
 
-        function createDrop() {
-            const drop = document.createElement('a-sphere');
-            let x = (Math.random() - 0.5) * 3;
-            let y = 4;
-            drop.setAttribute('radius', '0.12');
-            drop.setAttribute('color', '#00ffcc');
-            drop.setAttribute('position', `${x} ${y} 0`);
-            container.appendChild(drop);
+        function createFruit() {
+            const fruit = document.createElement('a-entity');
+            const randomModel = models[Math.floor(Math.random() * models.length)];
+            
+            let xPos = (Math.random() - 0.5) * 2;
+            let yPos = 4;
 
-            const timer = setInterval(() => {
-                y -= 0.06;
-                drop.setAttribute('position', `${x} ${y} 0`);
-                // 碰撞检测：杯子中心在 x=cupX, y=0 左右
-                if (y < 0.3 && y > 0 && Math.abs(x - cupX) < 0.4) {
-                    score++;
-                    document.getElementById('score-panel').innerText = `得分: ${score}`;
-                    clearInterval(timer);
-                    drop.remove();
+            fruit.setAttribute('gltf-model', randomModel);
+            fruit.setAttribute('scale', '0.08 0.08 0.08');
+            fruit.setAttribute('position', `${xPos} ${yPos} 0`);
+            dropZone.appendChild(fruit);
+
+            const fallTick = setInterval(() => {
+                yPos -= 0.05;
+                fruit.setAttribute('position', `${xPos} ${yPos} 0`);
+
+                // 简单的碰撞检测
+                if (yPos < 0.3 && yPos > 0 && Math.abs(xPos - cupX) < 0.3) {
+                    score += 10;
+                    document.getElementById('score-ui').innerText = `得分: ${score}`;
+                    clearInterval(fallTick);
+                    fruit.remove();
                 }
-                if (y < -0.5) { clearInterval(timer); drop.remove(); }
+
+                if (yPos < -1) {
+                    clearInterval(fallTick);
+                    fruit.remove();
+                }
             }, 20);
         }
     </script>
