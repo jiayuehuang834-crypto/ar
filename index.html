@@ -3,33 +3,30 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR Side-View Collector</title>
+    <title>AR Side-View Collector - Final</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #000; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #222 0%, #000 100%); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; }
         #score-ui { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); color: #00ffcc; font-size: 32px; font-weight: bold; z-index: 100; text-shadow: 0 0 15px rgba(0,255,204,0.6); pointer-events: none; }
-        button { padding: 16px 45px; font-size: 18px; background: #00ffcc; border: none; border-radius: 35px; color: #000; font-weight: bold; cursor: pointer; box-shadow: 0 5px 15px rgba(0,255,204,0.3); }
-        .hint { margin-top: 20px; font-size: 13px; color: #888; }
+        button { padding: 16px 45px; font-size: 18px; background: #00ffcc; border: none; border-radius: 35px; color: #000; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 
 <body>
     <div id="overlay">
-        <h1 style="letter-spacing: 4px;">AR 采集挑战</h1>
-        <p style="margin-bottom: 30px;">对准海报，倾斜手机捕捉坠落物</p>
-        <button id="start-btn">进入空间</button>
-        <p class="hint">建议将海报平铺于桌面，手机呈45度角扫描</p>
+        <h1>AR 采集挑战</h1>
+        <button id="start-btn">开始游戏</button>
     </div>
 
     <div id="score-ui">0</div>
 
     <a-scene 
         embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;"
-        renderer="logarithmicDepthBuffer: true; colorManagement: true; antialias: true;"
+        arjs="sourceType: webcam; debugUIEnabled: false;"
+        renderer="logarithmicDepthBuffer: true; colorManagement: true;"
         vr-mode-ui="enabled: false">
         
         <a-assets timeout="180000">
@@ -41,14 +38,14 @@
         </a-assets>
 
         <a-marker type="pattern" url="./poster.patt" id="game-marker">
-            <a-entity light="type: ambient; intensity: 1.1;"></a-entity>
+            <a-entity light="type: ambient; intensity: 1.2;"></a-entity>
             <a-entity light="type: directional; position: 0 5 2; intensity: 0.7;"></a-entity>
 
             <a-entity id="player-cup" 
                       gltf-model="#cup-m" 
-                      scale="0.08 0.08 0.08" 
-                      position="0 0.1 0"
-                      rotation="90 0 0">
+                      scale="0.2 0.2 0.2" 
+                      position="0 0.2 0"
+                      rotation="-90 0 0">
             </a-entity>
 
             <a-entity id="drop-zone"></a-entity>
@@ -69,24 +66,20 @@
         document.getElementById('start-btn').addEventListener('click', function() {
             document.getElementById('overlay').style.display = 'none';
             isStarted = true;
-            // 触发 iOS 权限
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission();
             }
             startGameLoop();
         });
 
-        // 陀螺仪：控制受限的左右平移
         window.addEventListener('deviceorientation', (e) => {
             if(!isStarted || !marker.getAttribute('visible')) return;
-            
             let tilt = e.gamma; 
             if(Math.abs(tilt) > 1.5) {
-                // 移动系数设定为 0.005，保持丝滑但不过快
                 cupX += tilt * 0.005; 
-                // 限制杯子在海报中心区域移动，防止超出手机屏幕范围
+                // 限制左右移动范围
                 cupX = Math.max(-0.8, Math.min(0.8, cupX)); 
-                player.setAttribute('position', `${cupX} 0.1 0`);
+                player.setAttribute('position', `${cupX} 0.2 0`);
             }
         });
 
@@ -102,31 +95,29 @@
             const fruit = document.createElement('a-entity');
             const randomModel = models[Math.floor(Math.random() * models.length)];
             
-            // 坠落物生成在左右 -0.8 到 0.8 之间，与杯子范围匹配
             let xPos = (Math.random() - 0.5) * 1.6; 
-            let zPos = -4; // 初始位置在海报最远端（屏幕上方）
-            let yPos = 0.1; // 贴着海报表面的高度
+            let zPos = -4; 
+            let yPos = 0.2; 
 
             fruit.setAttribute('gltf-model', randomModel);
-            fruit.setAttribute('scale', '0.07 0.07 0.07');
-            // 坠落物也保持侧向，视觉更协调
+            // 【修改点2】扩大坠落物大小
+            fruit.setAttribute('scale', '0.15 0.15 0.15');
             fruit.setAttribute('rotation', '90 0 0');
             fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
             dropZone.appendChild(fruit);
 
             const fallTick = setInterval(() => {
-                zPos += 0.07; // 物体向用户方向（海报近端）滑动
+                zPos += 0.08; 
                 fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
 
-                // 碰撞检测：当物体到达杯子所在的 Z 轴位置(0附近)
-                if (zPos > -0.2 && zPos < 0.2 && Math.abs(xPos - cupX) < 0.3) {
+                // 【修改点3】配合大模型，扩大碰撞判定范围 (0.45)
+                if (zPos > -0.2 && zPos < 0.2 && Math.abs(xPos - cupX) < 0.45) {
                     score += 10;
                     document.getElementById('score-ui').innerText = score;
                     clearInterval(fallTick);
                     fruit.remove();
                 }
 
-                // 飞出视野底部移除
                 if (zPos > 1.5) {
                     clearInterval(fallTick);
                     fruit.remove();
