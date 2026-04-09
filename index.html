@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        #score-panel { position: fixed; top: 20px; width: 100%; text-align: center; color: #00ffcc; font-family: sans-serif; font-size: 24px; z-index: 100; text-shadow: 0 0 5px #000; }
+        button { padding: 15px 30px; font-size: 18px; background: #00ffcc; border: none; border-radius: 50px; cursor: pointer; }
+    </style>
+</head>
+
+<body style="margin: 0; overflow: hidden;">
+    <div id="overlay">
+        <h1>准备好 AR 挑战了吗？</h1>
+        <p>请对准海报，倾斜手机控制杯子</p>
+        <button onclick="initGame()">点击开始</button>
+    </div>
+
+    <div id="score-panel">得分: 0</div>
+
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;">
+        <a-assets>
+            <a-asset-item id="cup-model" src="cup.glb"></a-asset-item>
+        </a-assets>
+
+        <a-marker type="pattern" url="poster.patt" id="marker">
+            <a-entity id="cup-entity" gltf-model="#cup-model" scale="0.5 0.5 0.5" position="0 0.1 0"></a-entity>
+            <a-entity id="items-group"></a-entity>
+        </a-marker>
+
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        let score = 0;
+        let cupX = 0;
+        let isPlaying = false;
+        const cup = document.getElementById('cup-entity');
+        const container = document.getElementById('items-group');
+
+        function initGame() {
+            document.getElementById('overlay').style.display = 'none';
+            isPlaying = true;
+            // 兼容 iOS 的重力感应授权请求
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission();
+            }
+            startSpawning();
+        }
+
+        // 监听手机倾斜
+        window.addEventListener('deviceorientation', (event) => {
+            if (!isPlaying) return;
+            let tilt = event.gamma; // 左右倾斜
+            if (Math.abs(tilt) > 3) {
+                cupX += tilt * 0.006;
+                cupX = Math.max(-1.5, Math.min(1.5, cupX)); 
+                cup.setAttribute('position', `${cupX} 0.1 0`);
+            }
+        });
+
+        function startSpawning() {
+            setInterval(() => {
+                if (!isPlaying) return;
+                createDrop();
+            }, 1200);
+        }
+
+        function createDrop() {
+            const drop = document.createElement('a-sphere');
+            let x = (Math.random() - 0.5) * 3;
+            let y = 4;
+            drop.setAttribute('radius', '0.12');
+            drop.setAttribute('color', '#00ffcc');
+            drop.setAttribute('position', `${x} ${y} 0`);
+            container.appendChild(drop);
+
+            const timer = setInterval(() => {
+                y -= 0.06;
+                drop.setAttribute('position', `${x} ${y} 0`);
+                // 碰撞检测：杯子中心在 x=cupX, y=0 左右
+                if (y < 0.3 && y > 0 && Math.abs(x - cupX) < 0.4) {
+                    score++;
+                    document.getElementById('score-panel').innerText = `得分: ${score}`;
+                    clearInterval(timer);
+                    drop.remove();
+                }
+                if (y < -0.5) { clearInterval(timer); drop.remove(); }
+            }, 20);
+        }
+    </script>
+</body>
+</html>
