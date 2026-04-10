@@ -3,22 +3,24 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR Collector - Max Vision</title>
+    <title>AR Collector - Optimized</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
 
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #000; }
         #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; }
-        #score-ui { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); color: #00ffcc; font-size: 36px; font-weight: bold; z-index: 100; text-shadow: 0 0 20px rgba(0,255,204,0.7); pointer-events: none; }
-        button { padding: 18px 50px; font-size: 20px; background: #00ffcc; border: none; border-radius: 40px; color: #000; font-weight: bold; cursor: pointer; box-shadow: 0 0 25px rgba(0,255,204,0.5); }
+        #score-ui { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); color: #00ffcc; font-size: 32px; font-weight: bold; z-index: 100; text-shadow: 0 0 10px rgba(0,0,0,0.5); pointer-events: none; }
+        button { padding: 16px 45px; font-size: 18px; background: #00ffcc; border: none; border-radius: 35px; color: #000; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 
 <body>
     <div id="overlay">
-        <h1 style="letter-spacing: 2px;">AR 采集挑战</h1>
-        <p style="color: #888;">对准海报，感受巨型物体掉落</p>
+        <h1>AR 采集挑战</h1>
+        <p style="color: #888;">正在优化资源...</p>
         <button id="start-btn">开始游戏</button>
     </div>
 
@@ -39,13 +41,13 @@
         </a-assets>
 
         <a-marker type="pattern" url="./poster.patt" id="game-marker">
-            <a-entity light="type: ambient; intensity: 1.3;"></a-entity>
-            <a-entity light="type: directional; position: 0 5 2; intensity: 0.8;"></a-entity>
+            <a-entity light="type: ambient; intensity: 1.2;"></a-entity>
+            <a-entity light="type: directional; position: 0 5 2; intensity: 0.7;"></a-entity>
 
             <a-entity id="player-cup" 
                       gltf-model="#cup-m" 
-                      scale="0.35 0.35 0.35" 
-                      position="0 0.3 0.5"
+                      scale="0.22 0.22 0.22" 
+                      position="0 0.2 0.2"
                       rotation="-90 0 0">
             </a-entity>
 
@@ -73,16 +75,14 @@
             startGameLoop();
         });
 
-        // 【移动逻辑优化】：
-        // 1. 降低系数 (0.003)，操作更沉稳，解决灵敏度过高问题
-        // 2. 缩小范围 (-0.6 到 0.6)，让杯子始终在屏幕视觉中心块移动
         window.addEventListener('deviceorientation', (e) => {
             if(!isStarted || !marker.getAttribute('visible')) return;
             let tilt = e.gamma; 
-            if(Math.abs(tilt) > 2) {
-                cupX += tilt * 0.003; 
-                cupX = Math.max(-0.6, Math.min(0.6, cupX)); 
-                player.setAttribute('position', `${cupX} 0.3 0.5`);
+            if(Math.abs(tilt) > 1.5) {
+                // 灵敏度保持在 0.004，范围收紧
+                cupX += tilt * 0.004; 
+                cupX = Math.max(-0.7, Math.min(0.7, cupX)); 
+                player.setAttribute('position', `${cupX} 0.2 0.2`);
             }
         });
 
@@ -91,39 +91,37 @@
                 if (marker.getAttribute('visible')) {
                     createFruit();
                 }
-            }, 1600); // 稍微加快节奏
+            }, 1800);
         }
 
         function createFruit() {
             const fruit = document.createElement('a-entity');
             const randomModel = models[Math.floor(Math.random() * models.length)];
             
-            // 掉落范围与杯子移动范围匹配
-            let xPos = (Math.random() - 0.5) * 1.2; 
-            let zPos = -4.5; 
-            let yPos = 0.3; 
+            let xPos = (Math.random() - 0.5) * 1.4; 
+            let zPos = -4; 
+            let yPos = 0.2; 
 
             fruit.setAttribute('gltf-model', randomModel);
-            // 【坠落物优化】：扩大为与之前杯子相当的大小 (0.25)
-            fruit.setAttribute('scale', '0.25 0.25 0.25');
+            // 坠落物缩小到 0.15
+            fruit.setAttribute('scale', '0.15 0.15 0.15');
             fruit.setAttribute('rotation', '90 0 0');
             fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
             dropZone.appendChild(fruit);
 
             const fallTick = setInterval(() => {
-                zPos += 0.09; // 速度稍微加快，配合巨大化的视觉效果
+                zPos += 0.08; 
                 fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
 
-                // 【碰撞检测优化】：针对巨大化模型，将判定半径扩大到 0.6
-                // 注意杯子现在在 z=0.5 处，所以判定区间设为 0.3 到 0.7
-                if (zPos > 0.3 && zPos < 0.7 && Math.abs(xPos - cupX) < 0.6) {
+                // 碰撞检测：针对 z=0.2 的杯子位置，判定区间设为 0.0 到 0.4
+                if (zPos > 0.0 && zPos < 0.4 && Math.abs(xPos - cupX) < 0.4) {
                     score += 10;
                     document.getElementById('score-ui').innerText = score;
                     clearInterval(fallTick);
                     fruit.remove();
                 }
 
-                if (zPos > 2.5) {
+                if (zPos > 2) {
                     clearInterval(fallTick);
                     fruit.remove();
                 }
