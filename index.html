@@ -131,7 +131,7 @@
 
         // 新增：檢查勝利邏輯
         function checkWin() {
-            if (score >= 200) {
+            if (score >=100) {
                 gameActive = false; // 停止邏輯
                 clearInterval(spawnInterval); // 停止生成物體
                 document.getElementById('win-screen').style.display = 'flex'; // 顯示結局
