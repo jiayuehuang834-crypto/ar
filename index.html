@@ -3,26 +3,61 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR Collector - 270 Flip</title>
+    <title>AR Collector - Game End Support</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #000; }
+        
+        /* 初始遮罩層 */
         #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; }
+        
+        /* 計分 UI */
         #score-ui { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); color: #00ffcc; font-size: 36px; font-weight: bold; z-index: 100; text-shadow: 0 0 15px rgba(0,255,204,0.6); pointer-events: none; }
-        button { padding: 18px 50px; font-size: 20px; background: #00ffcc; border: none; border-radius: 40px; color: #000; font-weight: bold; cursor: pointer; }
+        
+        /* 【結局頁面】：初始狀態為 hidden */
+        #win-screen { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0, 0, 0, 0.85); 
+            z-index: 10000; 
+            display: none; /* 預設隱藏 */
+            flex-direction: column; justify-content: center; align-items: center; 
+            color: #fff; text-align: center; 
+            backdrop-filter: blur(10px);
+        }
+
+        .win-content {
+            padding: 30px;
+            border: 2px solid #00ffcc;
+            border-radius: 20px;
+            background: rgba(0, 255, 204, 0.1);
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+        }
+
+        h2 { color: #00ffcc; font-size: 28px; margin-bottom: 10px; }
+        p { font-size: 18px; margin-bottom: 25px; line-height: 1.6; }
+        
+        button { padding: 18px 50px; font-size: 18px; background: #00ffcc; border: none; border-radius: 40px; color: #000; font-weight: bold; cursor: pointer; box-shadow: 0 5px 15px rgba(0,255,204,0.3); }
     </style>
 </head>
 
 <body>
     <div id="overlay">
-        <h1>AR 纤体瓶</h1>
-        <p style="color: #888; margin-bottom: 20px;">相机权限已打开，准备开始</p>
-        <button id="start-btn">开始游戏</button>
+        <h1>AR 採集挑戰</h1>
+        <p style="color: #888; margin-bottom: 20px;">目標分數：200分</p>
+        <button id="start-btn">開始遊戲</button>
     </div>
 
     <div id="score-ui">0</div>
+
+    <div id="win-screen">
+        <div class="win-content">
+            <h2>🎉 恭喜完成挑戰！</h2>
+            <p>你已成功採集足夠的蔬果能量<br><strong style="font-size: 24px; color: #fff;">恭喜你獲得纖體瓶獎勵</strong></p>
+            <button onclick="location.reload()">再玩一次</button>
+        </div>
+    </div>
 
     <a-scene 
         embedded 
@@ -59,6 +94,9 @@
         let score = 0;
         let cupX = 0;
         let isStarted = false;
+        let gameActive = true; // 新增：控制遊戲是否正在進行
+        let spawnInterval;      // 新增：儲存定時器
+
         const player = document.querySelector('#player-cup');
         const dropZone = document.querySelector('#drop-zone');
         const marker = document.querySelector('#game-marker');
@@ -73,9 +111,8 @@
             startGameLoop();
         });
 
-        // 移动逻辑：保持沉稳的手感
         window.addEventListener('deviceorientation', (e) => {
-            if(!isStarted || !marker.getAttribute('visible')) return;
+            if(!isStarted || !gameActive || !marker.getAttribute('visible')) return;
             let tilt = e.gamma; 
             if(Math.abs(tilt) > 2) {
                 cupX += tilt * 0.003; 
@@ -85,11 +122,20 @@
         });
 
         function startGameLoop() {
-            setInterval(() => {
-                if (marker.getAttribute('visible')) {
+            spawnInterval = setInterval(() => {
+                if (gameActive && marker.getAttribute('visible')) {
                     createFruit();
                 }
             }, 1800);
+        }
+
+        // 新增：檢查勝利邏輯
+        function checkWin() {
+            if (score >= 200) {
+                gameActive = false; // 停止邏輯
+                clearInterval(spawnInterval); // 停止生成物體
+                document.getElementById('win-screen').style.display = 'flex'; // 顯示結局
+            }
         }
 
         function createFruit() {
@@ -107,15 +153,21 @@
             dropZone.appendChild(fruit);
 
             const fallTick = setInterval(() => {
+                if (!gameActive) { // 如果遊戲結束，移除正在掉落的物體
+                    clearInterval(fallTick);
+                    fruit.remove();
+                    return;
+                }
+
                 zPos += 0.08; 
                 fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
 
-                // 碰撞检测区间
                 if (zPos > 0.0 && zPos < 0.4 && Math.abs(xPos - cupX) < 0.55) {
                     score += 10;
                     document.getElementById('score-ui').innerText = score;
                     clearInterval(fallTick);
                     fruit.remove();
+                    checkWin(); // 每次得分都檢查一次
                 }
 
                 if (zPos > 2) {
