@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR Collector - X-Flip Edition</title>
+    <title>AR Collector - 270 Flip</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
@@ -17,8 +17,8 @@
 
 <body>
     <div id="overlay">
-        <h1 style="letter-spacing: 2px;">AR 采集挑战</h1>
-        <p style="color: #888; margin-bottom: 20px;">瓶口方向已翻转，准备采集</p>
+        <h1>AR 采集挑战</h1>
+        <p style="color: #888; margin-bottom: 20px;">视角已重置 (270°)，准备开始</p>
         <button id="start-btn">开始游戏</button>
     </div>
 
@@ -46,7 +46,7 @@
                       gltf-model="#cup-m" 
                       scale="0.3 0.3 0.3" 
                       position="0 0.3 0.2"
-                      rotation="90 0 0">
+                      rotation="270 0 0">
             </a-entity>
 
             <a-entity id="drop-zone"></a-entity>
@@ -73,13 +73,12 @@
             startGameLoop();
         });
 
-        // 移动逻辑：进一步收紧范围并降低灵敏度，适合大模型
+        // 移动逻辑：保持沉稳的手感
         window.addEventListener('deviceorientation', (e) => {
             if(!isStarted || !marker.getAttribute('visible')) return;
             let tilt = e.gamma; 
             if(Math.abs(tilt) > 2) {
                 cupX += tilt * 0.003; 
-                // 范围锁定在 -0.6 到 0.6 之间，确保大杯子不跑出手机屏
                 cupX = Math.max(-0.6, Math.min(0.6, cupX)); 
                 player.setAttribute('position', `${cupX} 0.3 0.2`);
             }
@@ -102,7 +101,6 @@
             let yPos = 0.3; 
 
             fruit.setAttribute('gltf-model', randomModel);
-            // 坠落物同步放大
             fruit.setAttribute('scale', '0.2 0.2 0.2');
             fruit.setAttribute('rotation', '90 0 0');
             fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
@@ -112,7 +110,7 @@
                 zPos += 0.08; 
                 fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
 
-                // 【碰撞检测优化】：基于 0.3 的 cup 缩放，判定范围扩大到 0.55
+                // 碰撞检测区间
                 if (zPos > 0.0 && zPos < 0.4 && Math.abs(xPos - cupX) < 0.55) {
                     score += 10;
                     document.getElementById('score-ui').innerText = score;
