@@ -3,46 +3,57 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR Collector - Stable Horizontal Motion</title>
+    <title>AR Collector - Ultimate Stable Edition</title>
+    <!-- 引入 A-Frame -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <!-- 引入专门的 NFT 版 AR.js -->
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #000; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; }
+        /* 加载提示层 */
+        .arjs-loader { height: 100%; width: 100%; position: absolute; top: 0; left: 0; background-color: rgba(0, 0, 0, 0.9); z-index: 9998; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #00ffcc; }
+        .arjs-loader div { text-align: center; font-size: 1.2em; line-height: 1.5; }
+        
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9997; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; }
         #score-ui { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); color: #00ffcc; font-size: 36px; font-weight: bold; z-index: 100; text-shadow: 0 0 15px rgba(0,255,204,0.6); pointer-events: none; }
         #win-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; backdrop-filter: blur(15px); }
         .win-content { padding: 40px; border: 3px solid #00ffcc; border-radius: 30px; background: rgba(0, 255, 204, 0.1); }
-        .arjs-loader { height: 100%; width: 100%; position: absolute; top: 0; left: 0; background-color: rgba(0, 0, 0, 0.9); z-index: 9998; display: flex; justify-content: center; align-items: center; }
-        .arjs-loader div { text-align: center; font-size: 1.25em; color: #00ffcc; }
-        button { padding: 20px 60px; font-size: 20px; background: #00ffcc; border: none; border-radius: 50px; color: #000; font-weight: bold; cursor: pointer; }
+        button { padding: 20px 60px; font-size: 20px; background: #00ffcc; border: none; border-radius: 50px; color: #000; font-weight: bold; cursor: pointer; margin-top: 20px; }
     </style>
 </head>
 
 <body>
+    <!-- 加载层：提示用户正在读取 NFT 数据 -->
     <div class="arjs-loader" id="loader">
-        <div>正在锁定海报特征...<br><small style="color:#666">请保持手机平行于海报</small></div>
+        <div>
+            <div style="font-size: 2em; margin-bottom: 10px;">🌟</div>
+            正在初始化海报识别...<br>
+            <span style="font-size: 0.7em; color: #888;">首次加载可能需要 10-20 秒，请保持光线充足</span>
+        </div>
     </div>
 
+    <!-- 启动层 -->
     <div id="overlay">
         <h1>AR 采集挑战</h1>
-        <p style="color: #aaa; margin-bottom: 30px;">左右倾斜手机控制瓶子移动</p>
-        <button id="start-btn">开始挑战</button>
+        <p style="color: #aaa;">左右倾斜手机捕捉蔬果能量</p>
+        <button id="start-btn">确认进入</button>
     </div>
 
     <div id="score-ui">0</div>
 
     <div id="win-screen">
         <div class="win-content">
-            <h2 style="color: #00ffcc;">目标达成！</h2>
-            <p>已成功获取纤体能量<br><strong style="font-size: 24px; color: #fff;">恭喜获得纤体瓶奖励</strong></p>
-            <button onclick="location.reload()">再次开启</button>
+            <h2 style="color: #00ffcc;">挑战成功！</h2>
+            <p>能量已注满<br><strong style="font-size: 24px;">恭喜获得纤体瓶奖励</strong></p>
+            <button onclick="location.reload()">再玩一次</button>
         </div>
     </div>
 
+    <!-- 场景配置：开启抗锯齿、对数深度缓冲区以减轻抖动 -->
     <a-scene 
         vr-mode-ui="enabled: false;"
-        renderer="logarithmicDepthBuffer: true; colorManagement: true; antialias: true;"
+        renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true; precision: high;"
         embedded 
         arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
         
@@ -54,19 +65,24 @@
             <a-asset-item id="lemon-m" src="lemon-v5.glb"></a-asset-item>
         </a-assets>
 
+        <!-- 
+            NFT 配置优化：
+            - smoothCount 增加到 25：牺牲一点延迟换取极致平滑。
+            - smoothTolerance 和 smoothThreshold：过滤像素级微颤。
+        -->
         <a-nft
             id="game-marker"
             type="nft"
             url="./poster_nft" 
             smooth="true"
-            smoothCount="15"
-            smoothTolerance=".01"
-            smoothThreshold="5">
+            smoothCount="25"
+            smoothTolerance=".03"
+            smoothThreshold="8">
 
             <a-entity light="type: ambient; intensity: 1.6;"></a-entity>
             <a-entity light="type: directional; position: 0 10 10; intensity: 1.2;"></a-entity>
 
-            <!-- 瓶子大小保持 150 不变，位置保持 450 高度 -->
+            <!-- 瓶子：体积 150，位置固定 450 高度 -->
             <a-entity id="player-cup" 
                       gltf-model="#cup-m" 
                       scale="150 150 150" 
@@ -93,7 +109,9 @@
         const loader = document.getElementById('loader');
         const models = ['#apple-m', '#kale-m', '#kugua-m', '#lemon-m'];
 
+        // 核心修正：当识别器加载完描述符文件后，隐藏加载提示
         window.addEventListener('arjs-nft-loaded', () => {
+            console.log("NFT descriptors loaded!");
             loader.style.display = 'none';
         });
 
@@ -106,25 +124,22 @@
             startGameLoop();
         });
 
-        // 核心修改：仅监听 gamma (左右倾斜)，忽略 beta (前后/上下倾斜)
+        // 交互优化：锁定轴向，降低灵敏度至 2.5
         window.addEventListener('deviceorientation', (e) => {
             if(!isStarted || !gameActive || !marker.getAttribute('visible')) return;
             
-            let gamma = e.gamma; // 左右倾斜角度
-            
-            // 进一步降低灵敏度至 2.5
+            let gamma = e.gamma; 
             if(Math.abs(gamma) > 2) {
                 cupX += gamma * 2.5; 
-                // 限制水平移动范围
                 cupX = Math.max(-150, Math.min(450, cupX)); 
-                
-                // 仅更新 X 坐标，Y 和 Z 保持固定，实现模型稳定
+                // 仅更新 X，确保上下倾斜不产生视觉位移
                 player.setAttribute('position', `${cupX} 450 -150`);
             }
         });
 
         function startGameLoop() {
             spawnInterval = setInterval(() => {
+                // 只有当海报可见时才产生物体
                 if (gameActive && marker.getAttribute('visible')) {
                     createFruit();
                 }
@@ -150,7 +165,7 @@
             let yPos = 450; 
 
             fruit.setAttribute('gltf-model', randomModel);
-            // 【修改】：缩小掉落物体积至 50
+            // 掉落物缩小至 50
             fruit.setAttribute('scale', '50 50 50'); 
             fruit.setAttribute('rotation', '90 0 0');
             fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
@@ -166,7 +181,7 @@
                 zPos += 24; 
                 fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
 
-                // 碰撞半径维持 150，确保瓶子虽大但捕获感良好
+                // 碰撞判定半径维持 150 (瓶子大，捕捉范围广)
                 if (zPos > -200 && zPos < 150 && Math.abs(xPos - cupX) < 150) {
                     score += 10;
                     document.getElementById('score-ui').innerText = score;
