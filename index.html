@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR Collector - NFT Position Fixed</title>
+    <title>AR Collector - NFT Position & Scale Optimized</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
 
@@ -21,12 +21,12 @@
 
 <body>
     <div class="arjs-loader" id="loader">
-        <div>正在加载海报特征点...<br><small style="color:#888">请确保网络通畅</small></div>
+        <div>正在同步特征点...<br><small style="color:#888">请对准海报保持稳定</small></div>
     </div>
 
     <div id="overlay">
         <h1>AR 采集挑战</h1>
-        <p style="color: #888; margin-bottom: 20px;">扫描完整海报开始游戏</p>
+        <p style="color: #888; margin-bottom: 20px;">扫描海报中心开始</p>
         <button id="start-btn">开始游戏</button>
     </div>
 
@@ -34,15 +34,15 @@
 
     <div id="win-screen">
         <div class="win-content">
-            <h2>🎉 挑战成功！</h2>
-            <p>恭喜获得纤体瓶奖励</p>
+            <h2>🎉 恭喜达成！</h2>
+            <p>已成功注入蔬果能量<br><strong>恭喜获得纤体瓶奖励</strong></p>
             <button onclick="location.reload()">再玩一次</button>
         </div>
     </div>
 
     <a-scene 
         vr-mode-ui="enabled: false;"
-        renderer="logarithmicDepthBuffer: true; precision: medium; colorManagement: true;"
+        renderer="logarithmicDepthBuffer: true; colorManagement: true;"
         embedded 
         arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
         
@@ -63,20 +63,18 @@
             smoothTolerance=".01"
             smoothThreshold="5">
 
-            <!-- 环境光增强 -->
             <a-entity light="type: ambient; intensity: 1.5;"></a-entity>
             <a-entity light="type: directional; position: 0 10 10; intensity: 1;"></a-entity>
 
             <!-- 
-                【关键调整说明】：
-                1. scale 大幅增加：NFT 模式下 0.3 太小了，这里增加到 50-80。
-                2. position 重新校准：NFT 原点在左下角。这里将 Y 设为正数，把模型推向海报中心。
-                3. rotation：保持 270 0 0。
+                【关键调整】：
+                1. scale 增加到 100 (更大体积)
+                2. position Y 增加到 450 (位置上移)
             -->
             <a-entity id="player-cup" 
                       gltf-model="#cup-m" 
-                      scale="60 60 60" 
-                      position="150 250 -150" 
+                      scale="100 100 100" 
+                      position="150 450 -150" 
                       rotation="270 0 0">
             </a-entity>
 
@@ -88,7 +86,7 @@
 
     <script>
         let score = 0;
-        let cupX = 150; // 对应初始 position 的第一个值
+        let cupX = 150; 
         let isStarted = false;
         let gameActive = true;
         let spawnInterval;
@@ -116,11 +114,9 @@
             if(!isStarted || !gameActive || !marker.getAttribute('visible')) return;
             let tilt = e.gamma; 
             if(Math.abs(tilt) > 2) {
-                // 加大移动步长 (5.0)，因为像素坐标系很大
-                cupX += tilt * 5.0; 
-                // 限制在海报范围：假定海报逻辑宽度在 0 - 300 左右
-                cupX = Math.max(-50, Math.min(350, cupX)); 
-                player.setAttribute('position', `${cupX} 250 -150`);
+                cupX += tilt * 6.0; 
+                cupX = Math.max(-100, Math.min(400, cupX)); 
+                player.setAttribute('position', `${cupX} 450 -150`);
             }
         });
 
@@ -146,13 +142,12 @@
             const fruit = document.createElement('a-entity');
             const randomModel = models[Math.floor(Math.random() * models.length)];
             
-            // 随机生成位置配合像素坐标系
-            let xPos = (Math.random() * 300); 
-            let zPos = -1200; // 从远处滑向近处
-            let yPos = 250; 
+            let xPos = (Math.random() * 400 - 50); 
+            let zPos = -1500; 
+            let yPos = 450; // 掉落物起始高度与瓶子一致
 
             fruit.setAttribute('gltf-model', randomModel);
-            fruit.setAttribute('scale', '40 40 40');
+            fruit.setAttribute('scale', '70 70 70'); // 同步放大蔬果
             fruit.setAttribute('rotation', '90 0 0');
             fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
             dropZone.appendChild(fruit);
@@ -164,11 +159,11 @@
                     return;
                 }
 
-                zPos += 18; 
+                zPos += 22; // 略微提升掉落速度
                 fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
 
-                // 碰撞判定范围同步扩大
-                if (zPos > -200 && zPos < 50 && Math.abs(xPos - cupX) < 80) {
+                // 碰撞检测逻辑
+                if (zPos > -200 && zPos < 100 && Math.abs(xPos - cupX) < 120) {
                     score += 10;
                     document.getElementById('score-ui').innerText = score;
                     clearInterval(fallTick);
@@ -176,7 +171,7 @@
                     checkWin();
                 }
 
-                if (zPos > 300) {
+                if (zPos > 400) {
                     clearInterval(fallTick);
                     if(fruit.parentNode) fruit.parentNode.removeChild(fruit);
                 }
