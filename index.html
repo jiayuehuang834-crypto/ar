@@ -90,23 +90,22 @@
             startGameLoop();
         });
 
-        // 核心：点击“领取奖励”按钮触发电机
-        document.getElementById('reward-btn').addEventListener('click', function() {
-            const msg = document.getElementById('status-msg');
-            msg.innerText = "正在通过电脑启动设备...";
-            
-            // 你的电脑 IP 地址
-            fetch('http://172.20.10.7:3000/win')
-                .then(res => {
-                    msg.innerText = "✅ 奖励发放中，请查收！";
-                    // 3秒后自动刷新页面，方便下一个人玩
-                    setTimeout(() => location.reload(), 3000);
-                })
-                .catch(err => {
-                    msg.innerText = "❌ 无法连接电脑，请检查 WiFi 或 IP";
-                    console.error(err);
-                });
+        // 核心：點擊「領取獎勵」按鈕觸發電機
+document.getElementById('reward-btn').addEventListener('click', function() {
+    const msg = document.getElementById('status-msg');
+    msg.innerText = "正在通過電腦啟動設備...";
+    
+    // 【更新點】更換為你最新的熱點 IP 地址
+    fetch('http://172.20.10.7:3000/win')
+        .then(res => {
+            msg.innerText = "✅ 獎勵發放中，請查收！";
+            setTimeout(() => location.reload(), 3000);
+        })
+        .catch(err => {
+            msg.innerText = "❌ 無法連接電腦，請檢查熱點連接或防火牆";
+            console.error(err);
         });
+});
 
         window.addEventListener('deviceorientation', (e) => {
             if(!isStarted || !gameActive || !marker.getAttribute('visible')) return;
