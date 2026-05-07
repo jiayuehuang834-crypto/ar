@@ -1,105 +1,201 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR互动领奖游戏</title>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mind-ar-image-three.prod.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>AR Collector - Ultimate Stable Edition</title>
+    <!-- 引入 A-Frame -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <!-- 引入专门的 NFT 版 AR.js -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+
     <style>
-        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 1px 1px 2px black; z-index: 10; }
-        #score { font-size: 24px; font-weight: bold; }
-        #win-screen {
-            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); color: white; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 20;
-        }
-        button { padding: 10px 20px; font-size: 18px; cursor: pointer; background: #ffcc00; border: none; border-radius: 5px; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #000; }
+        /* 加载提示层 */
+        .arjs-loader { height: 100%; width: 100%; position: absolute; top: 0; left: 0; background-color: rgba(0, 0, 0, 0.9); z-index: 9998; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #00ffcc; }
+        .arjs-loader div { text-align: center; font-size: 1.2em; line-height: 1.5; }
+        
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9997; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; }
+        #score-ui { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); color: #00ffcc; font-size: 36px; font-weight: bold; z-index: 100; text-shadow: 0 0 15px rgba(0,255,204,0.6); pointer-events: none; }
+        #win-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; backdrop-filter: blur(15px); }
+        .win-content { padding: 40px; border: 3px solid #00ffcc; border-radius: 30px; background: rgba(0, 255, 204, 0.1); }
+        button { padding: 20px 60px; font-size: 20px; background: #00ffcc; border: none; border-radius: 50px; color: #000; font-weight: bold; cursor: pointer; margin-top: 20px; }
     </style>
 </head>
+
 <body>
-    <div id="ui">
-        <div>分数: <span id="score">0</span> / 200</div>
+    <!-- 加载层：提示用户正在读取 NFT 数据 -->
+    <div class="arjs-loader" id="loader">
+        <div>
+            <div style="font-size: 2em; margin-bottom: 10px;">🌟</div>
+            正在初始化海报识别...<br>
+            <span style="font-size: 0.7em; color: #888;">首次加载可能需要 10-20 秒，请保持光线充足</span>
+        </div>
     </div>
+
+    <!-- 启动层 -->
+    <div id="overlay">
+        <h1>AR 采集挑战</h1>
+        <p style="color: #aaa;">左右倾斜手机捕捉蔬果能量</p>
+        <button id="start-btn">确认进入</button>
+    </div>
+
+    <div id="score-ui">0</div>
 
     <div id="win-screen">
-        <h1>🎉 挑战成功！</h1>
-        <p>物理奖励已发放，请在出料口领取</p>
-        <button onclick="location.reload()">再玩一次</button>
+        <div class="win-content">
+            <h2 style="color: #00ffcc;">挑战成功！</h2>
+            <p>能量已注满<br><strong style="font-size: 24px;">恭喜获得纤体瓶奖励</strong></p>
+            <button onclick="location.reload()">再玩一次</button>
+        </div>
     </div>
 
-    <script type="module">
-        const THREE = window.MINDAR.IMAGE.THREE;
-        let score = 0;
-        let gameActive = false;
-        const targetScore = 200;
-
-        // --- 1. 初始化 MindAR ---
-        const mindarThree = new THREE.MindARThree({
-            container: document.body,
-            imageTargetSrc: './targets.mind', // 确保你的 .mind 文件路径正确
-        });
-        const {renderer, scene, camera} = mindarThree;
-
-        // 添加灯光
-        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-        scene.add(light);
-
-        // --- 2. 设置追踪目标 ---
-        const anchor = mindarThree.addAnchor(0);
+    <!-- 场景配置：开启抗锯齿、对数深度缓冲区以减轻抖动 -->
+    <a-scene 
+        vr-mode-ui="enabled: false;"
+        renderer="antialias: true; logarithmicDepthBuffer: true; colorManagement: true; precision: high;"
+        embedded 
+        arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
         
-        // 创建一个简单的篮子模型 (代替你未来的 .glb 文件)
-        const basketGeometry = new THREE.BoxGeometry(0.3, 0.1, 0.3);
-        const basketMaterial = new THREE.MeshBasicMaterial({color: 0x00ff00, transparent: true, opacity: 0.5});
-        const basket = new THREE.Mesh(basketGeometry, basketMaterial);
-        anchor.group.add(basket);
+        <a-assets timeout="180000">
+            <a-asset-item id="cup-m" src="cup-v6.glb"></a-asset-item>
+            <a-asset-item id="apple-m" src="apple-v2.glb"></a-asset-item>
+            <a-asset-item id="kale-m" src="kale-v3.glb"></a-asset-item>
+            <a-asset-item id="kugua-m" src="kugua-v4.glb"></a-asset-item>
+            <a-asset-item id="lemon-m" src="lemon-v5.glb"></a-asset-item>
+        </a-assets>
 
-        // --- 3. 游戏核心逻辑：触发物理电机 ---
-        function triggerPhysicalMotor() {
-            console.log("正在尝试触发物理装置...");
+        <!-- 
+            NFT 配置优化：
+            - smoothCount 增加到 25：牺牲一点延迟换取极致平滑。
+            - smoothTolerance 和 smoothThreshold：过滤像素级微颤。
+        -->
+        <a-nft
+            id="game-marker"
+            type="nft"
+            url="./poster_nft" 
+            smooth="true"
+            smoothCount="25"
+            smoothTolerance=".03"
+            smoothThreshold="8">
+
+            <a-entity light="type: ambient; intensity: 1.6;"></a-entity>
+            <a-entity light="type: directional; position: 0 10 10; intensity: 1.2;"></a-entity>
+
+            <!-- 瓶子：体积 150，位置固定 450 高度 -->
+            <a-entity id="player-cup" 
+                      gltf-model="#cup-m" 
+                      scale="150 150 150" 
+                      position="150 450 -150" 
+                      rotation="270 0 0">
+            </a-entity>
+
+            <a-entity id="drop-zone"></a-entity>
+        </a-nft>
+
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        let score = 0;
+        let cupX = 150; 
+        let isStarted = false;
+        let gameActive = true;
+        let spawnInterval;
+
+        const player = document.querySelector('#player-cup');
+        const dropZone = document.querySelector('#drop-zone');
+        const marker = document.querySelector('#game-marker');
+        const loader = document.getElementById('loader');
+        const models = ['#apple-m', '#kale-m', '#kugua-m', '#lemon-m'];
+
+        // 核心修正：当识别器加载完描述符文件后，隐藏加载提示
+        window.addEventListener('arjs-nft-loaded', () => {
+            console.log("NFT descriptors loaded!");
+            loader.style.display = 'none';
+        });
+
+        document.getElementById('start-btn').addEventListener('click', function() {
+            document.getElementById('overlay').style.display = 'none';
+            isStarted = true;
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission();
+            }
+            startGameLoop();
+        });
+
+        // 交互优化：锁定轴向，降低灵敏度至 2.5
+        window.addEventListener('deviceorientation', (e) => {
+            if(!isStarted || !gameActive || !marker.getAttribute('visible')) return;
             
-            // 【关键】填入你之前测试成功的本地 IP 地址
-            const serverUrl = 'http://10.136.12.40:3000/win';
+            let gamma = e.gamma; 
+            if(Math.abs(gamma) > 2) {
+                cupX += gamma * 2.5; 
+                cupX = Math.max(-150, Math.min(450, cupX)); 
+                // 仅更新 X，确保上下倾斜不产生视觉位移
+                player.setAttribute('position', `${cupX} 450 -150`);
+            }
+        });
 
-            fetch(serverUrl)
-                .then(response => {
-                    if (response.ok) {
-                        console.log("✅ 成功发送指令到本地服务器");
-                    }
-                })
-                .catch(err => {
-                    console.error("❌ 无法连接到本地服务器，请检查 WiFi 或 IP:", err);
-                    alert("连接本地设备失败，请确保电脑端 Node.js 已启动！");
-                });
+        function startGameLoop() {
+            spawnInterval = setInterval(() => {
+                // 只有当海报可见时才产生物体
+                if (gameActive && marker.getAttribute('visible')) {
+                    createFruit();
+                }
+            }, 1800);
         }
 
         function checkWin() {
-            if (score >= targetScore && !gameActive === false) {
-                gameActive = false; // 停止游戏
+            if (score >= 200) {
+                gameActive = false;
+                clearInterval(spawnInterval);
                 document.getElementById('win-screen').style.display = 'flex';
-                
-                // 执行物理联动
-                triggerPhysicalMotor();
             }
         }
 
-        // --- 4. 模拟得分过程 (实际开发中请替换为你捕获物体的逻辑) ---
-        // 这里为了演示，点击屏幕即加分
-        window.addEventListener('click', () => {
-            if (score < targetScore) {
-                score += 50;
-                document.getElementById('score').innerText = score;
-                checkWin();
-            }
-        });
+        function createFruit() {
+            if (dropZone.children.length > 8) return;
 
-        // --- 5. 启动 AR ---
-        const start = async() => {
-            await mindarThree.start();
-            renderer.setAnimationLoop(() => {
-                renderer.render(scene, camera);
-            });
+            const fruit = document.createElement('a-entity');
+            const randomModel = models[Math.floor(Math.random() * models.length)];
+            
+            let xPos = (Math.random() * 500 - 100); 
+            let zPos = -1600; 
+            let yPos = 450; 
+
+            fruit.setAttribute('gltf-model', randomModel);
+            // 掉落物缩小至 50
+            fruit.setAttribute('scale', '50 50 50'); 
+            fruit.setAttribute('rotation', '90 0 0');
+            fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
+            dropZone.appendChild(fruit);
+
+            const fallTick = setInterval(() => {
+                if (!gameActive) {
+                    clearInterval(fallTick);
+                    fruit.remove();
+                    return;
+                }
+
+                zPos += 24; 
+                fruit.setAttribute('position', `${xPos} ${yPos} ${zPos}`);
+
+                // 碰撞判定半径维持 150 (瓶子大，捕捉范围广)
+                if (zPos > -200 && zPos < 150 && Math.abs(xPos - cupX) < 150) {
+                    score += 10;
+                    document.getElementById('score-ui').innerText = score;
+                    clearInterval(fallTick);
+                    fruit.remove();
+                    checkWin();
+                }
+
+                if (zPos > 500) {
+                    clearInterval(fallTick);
+                    if(fruit.parentNode) fruit.parentNode.removeChild(fruit);
+                }
+            }, 25);
         }
-        start();
     </script>
 </body>
 </html>
